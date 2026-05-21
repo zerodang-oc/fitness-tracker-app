@@ -335,14 +335,14 @@ class _AddMealScreenState extends ConsumerState<AddMealScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await ref.read(databaseProvider.future);
+      final db = await ref.read(databaseProvider.future);
       final totalCal = _foodItems.fold<double>(0, (s, i) => s + i.calories);
       final totalCarbs = _foodItems.fold<double>(0, (s, i) => s + i.carbs);
       final totalProtein = _foodItems.fold<double>(0, (s, i) => s + i.protein);
       final totalFat = _foodItems.fold<double>(0, (s, i) => s + i.fat);
 
       // 保存餐食主记录
-      final mealId = await AppDatabase.addMealRecord(MealRecord(
+      final mealId = await db.addMealRecord(MealRecord(
         mealType: _mealType,
         eatenAt: DateTime.now(),
         totalCalories: totalCal,
@@ -353,7 +353,7 @@ class _AddMealScreenState extends ConsumerState<AddMealScreen> {
       ));
 
       // 保存餐食明细
-      AppDatabase.addMealItems(
+      db.addMealItems(
         _foodItems.map((item) => MealItem(
           mealId: mealId,
           foodName: item.name,

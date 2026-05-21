@@ -67,14 +67,14 @@ final mealDeficitsProvider = FutureProvider<Map<String, double>>((ref) async {
 
 /// 今日总结
 final todaySummaryProvider = FutureProvider<DailySummary?>((ref) async {
-  await ref.watch(databaseProvider.future);
+  final db = await ref.watch(databaseProvider.future);
   final date = ref.watch(selectedDateProvider);
-  return AppDatabase.getDailySummary(date);
+  return db.getDailySummary(date);
 });
 
 /// 保存每日总结并生成建议
 Future<void> saveDailySummary(dynamic ref, DateTime date) async {
-  await ref.read(databaseProvider.future);
+  final db = await ref.read(databaseProvider.future);
   final settings = await ref.read(userSettingsProvider.future);
   if (settings == null) return;
 
@@ -95,7 +95,7 @@ Future<void> saveDailySummary(dynamic ref, DateTime date) async {
     fatGrams: totalFat,
   );
 
-  final existingSummary = await AppDatabase.getDailySummary(date);
+  final existingSummary = await db.getDailySummary(date);
 
   final summary = DailySummary(
     id: existingSummary?.id ?? 0,
@@ -121,7 +121,7 @@ Future<void> saveDailySummary(dynamic ref, DateTime date) async {
     userSettings: settings,
   );
 
-  await AppDatabase.saveDailySummary(DailySummary(
+  await db.saveDailySummary(DailySummary(
     id: existingSummary?.id ?? 0,
     date: DateTime(date.year, date.month, date.day),
     bmr: bmr,

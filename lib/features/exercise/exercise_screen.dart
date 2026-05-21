@@ -141,8 +141,9 @@ class ExerciseScreen extends ConsumerWidget {
   }
 
   Future<void> _simulateHuaweiSync(WidgetRef ref) async {
+    final db = await ref.read(databaseProvider.future);
     final now = DateTime.now();
-    await AppDatabase.addExerciseRecord(ExerciseRecord(
+    await db.addExerciseRecord(ExerciseRecord(
       exerciseType: ExerciseType.walking,
       durationMinutes: 30,
       caloriesBurned: 120,
@@ -313,7 +314,7 @@ class _AddExerciseSheetState extends State<_AddExerciseSheet> {
 
     try {
       final db = await widget.ref.read(databaseProvider.future);
-      await AppDatabase.addExerciseRecord(ExerciseRecord(
+      await db.addExerciseRecord(ExerciseRecord(
         exerciseType: _selectedType,
         durationMinutes: duration,
         caloriesBurned: calories,

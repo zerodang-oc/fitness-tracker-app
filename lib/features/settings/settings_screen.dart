@@ -30,8 +30,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _loadSettings() async {
-    await ref.read(databaseProvider.future);
-    final settings = await AppDatabase.getUserSettings();
+    final db = await ref.read(databaseProvider.future);
+    final settings = await db.getUserSettings();
     if (settings != null) {
       _gender = settings.gender;
       _ageController.text = settings.age.toStringAsFixed(0);
@@ -302,8 +302,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     setState(() => _isSaving = true);
 
     try {
-      await ref.read(databaseProvider.future);
-      AppDatabase.saveUserSettings(UserSetting(
+      final db = await ref.read(databaseProvider.future);
+      await db.saveUserSettings(UserSetting(
         gender: _gender,
         age: double.parse(_ageController.text),
         height: double.parse(_heightController.text),
@@ -344,8 +344,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              await ref.read(databaseProvider.future);
-              AppDatabase.clearAllData();
+              final db = await ref.read(databaseProvider.future);
+              await db.clearAllData();
               ref.invalidate(userSettingsProvider);
               ref.invalidate(todayExerciseRecordsProvider);
               ref.invalidate(todayMealRecordsProvider);
