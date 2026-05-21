@@ -11,7 +11,7 @@ dependencies:
     sdk: flutter
   
   # 状态管理
-  flutter_riverpod:
+  flutter_riverpod: ^2.6.1
   
   # 数据库
   path_provider:
