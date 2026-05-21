@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/meal_type.dart';
 import '../../providers/database_provider.dart';
+import '../../core/database/tables.dart';
 
 /// 运动记录页面
 class ExerciseScreen extends ConsumerWidget {
@@ -124,7 +125,7 @@ class ExerciseScreen extends ConsumerWidget {
               Navigator.pop(ctx);
               // 模拟同步
               final db = await ref.read(databaseProvider.future);
-              await _simulateHuaweiSync(db, ref);
+              await _simulateHuaweiSync(ref);
               ref.invalidate(todayExerciseRecordsProvider);
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -139,10 +140,9 @@ class ExerciseScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _simulateHuaweiSync(AppDatabase db, WidgetRef ref) async {
+  Future<void> _simulateHuaweiSync(WidgetRef ref) async {
     final now = DateTime.now();
-    // 模拟步行数据
-    db.addExerciseRecord(ExerciseRecord(
+    await AppDatabase.addExerciseRecord(ExerciseRecord(
       exerciseType: ExerciseType.walking,
       durationMinutes: 30,
       caloriesBurned: 120,
@@ -313,7 +313,7 @@ class _AddExerciseSheetState extends State<_AddExerciseSheet> {
 
     try {
       final db = await widget.ref.read(databaseProvider.future);
-      db.addExerciseRecord(ExerciseRecord(
+      await AppDatabase.addExerciseRecord(ExerciseRecord(
         exerciseType: _selectedType,
         durationMinutes: duration,
         caloriesBurned: calories,

@@ -24,7 +24,7 @@ class UserSetting {
     this.updatedAt = '',
   });
 
-  factory UserSetting.fromMap(Map<String, dynamic> map) {
+    factory UserSetting.fromSqliteMap(Map<String, Object?> map) {
     return UserSetting(
       id: map['id'] as int,
       gender: map['gender'] as String,
@@ -56,7 +56,7 @@ class WeightRecord {
     this.source = 'manual',
   });
 
-  factory WeightRecord.fromMap(Map<String, dynamic> map) {
+    factory WeightRecord.fromSqliteMap(Map<String, Object?> map) {
     return WeightRecord(
       id: map['id'] as int,
       weight: (map['weight'] as num).toDouble(),
@@ -93,7 +93,7 @@ class ExerciseRecord {
     this.notes,
   });
 
-  factory ExerciseRecord.fromMap(Map<String, dynamic> map) {
+    factory ExerciseRecord.fromSqliteMap(Map<String, Object?> map) {
     return ExerciseRecord(
       id: map['id'] as int,
       exerciseType: map['exercise_type'] as String,
@@ -131,7 +131,7 @@ class FoodItem {
     this.fiberPer100g,
   });
 
-  factory FoodItem.fromMap(Map<String, dynamic> map) {
+    factory FoodItem.fromSqliteMap(Map<String, Object?> map) {
     return FoodItem(
       id: map['id'] as int,
       name: map['name'] as String,
@@ -171,7 +171,7 @@ class MealRecord {
     this.aiParsed = 0,
   });
 
-  factory MealRecord.fromMap(Map<String, dynamic> map) {
+    factory MealRecord.fromSqliteMap(Map<String, Object?> map) {
     return MealRecord(
       id: map['id'] as int,
       mealType: map['meal_type'] as String,
@@ -211,7 +211,7 @@ class MealItem {
     required this.protein,
   });
 
-  factory MealItem.fromMap(Map<String, dynamic> map) {
+    factory MealItem.fromSqliteMap(Map<String, Object?> map) {
     return MealItem(
       id: map['id'] as int,
       mealId: map['meal_id'] as int,
@@ -262,7 +262,7 @@ class DailySummary {
     this.suggestionGenerated = 0,
   });
 
-  factory DailySummary.fromMap(Map<String, dynamic> map) {
+    factory DailySummary.fromSqliteMap(Map<String, Object?> map) {
     return DailySummary(
       id: map['id'] as int,
       date: DateTime.parse(map['date'] as String),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/meal_type.dart';
 import '../../providers/database_provider.dart';
+import '../../core/database/tables.dart';
 
 /// 添加餐食页面 - 支持拍照识别和手动录入
 class AddMealScreen extends ConsumerStatefulWidget {
@@ -334,14 +335,14 @@ class _AddMealScreenState extends ConsumerState<AddMealScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final db = await ref.read(databaseProvider.future);
+      await ref.read(databaseProvider.future);
       final totalCal = _foodItems.fold<double>(0, (s, i) => s + i.calories);
       final totalCarbs = _foodItems.fold<double>(0, (s, i) => s + i.carbs);
       final totalProtein = _foodItems.fold<double>(0, (s, i) => s + i.protein);
       final totalFat = _foodItems.fold<double>(0, (s, i) => s + i.fat);
 
       // 保存餐食主记录
-      final mealId = db.addMealRecord(MealRecord(
+      final mealId = await AppDatabase.addMealRecord(MealRecord(
         mealType: _mealType,
         eatenAt: DateTime.now(),
         totalCalories: totalCal,
@@ -352,7 +353,7 @@ class _AddMealScreenState extends ConsumerState<AddMealScreen> {
       ));
 
       // 保存餐食明细
-      db.addMealItems(
+      AppDatabase.addMealItems(
         _foodItems.map((item) => MealItem(
           mealId: mealId,
           foodName: item.name,

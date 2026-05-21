@@ -4,6 +4,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/meal_type.dart';
 import '../../providers/database_provider.dart';
 import '../../providers/today_providers.dart';
+import '../../core/database/tables.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -35,7 +36,7 @@ class HomeScreen extends ConsumerWidget {
       body: settingsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => _buildEmptyState(context, ref, '加载失败: $e'),
-        data: (settings) {
+        data: (UserSetting? settings) {
           if (settings == null) {
             return _buildEmptyState(context, ref, '请先完成初始设置');
           }

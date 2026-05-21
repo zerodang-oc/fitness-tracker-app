@@ -1,43 +1,37 @@
-import 'dart:io';
+import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
-import 'package:sqlite3/sqlite3.dart';
 
 export 'tables.dart';
 import 'tables.dart';
 
-/// 数据库管理器 - 使用 SQLite 直接操作
+/// 数据库管理器 - 使用 sqflite
 class AppDatabase {
-  static AppDatabase? _instance;
-  late Database _db;
+  static Database? _db;
 
   AppDatabase._();
 
-  static Future<AppDatabase> getInstance() async {
-    if (_instance != null) return _instance!;
-    final instance = AppDatabase._();
-    await instance._init();
-    _instance = instance;
-    return instance;
+  static Future<Database> getInstance() async {
+    if (_db != null) return _db!;
+    final dbPath = await getDatabasesPath();
+    final path = p.join(dbPath, 'fitness_tracker.db');
+
+    _db = await openDatabase(
+      path,
+      version: 1,
+      onCreate: (db, version) async {
+        await _createTables(db);
+        await _seedFoodDatabase(db);
+      },
+      onConfigure: (db) async {
+        await db.execute('PRAGMA journal_mode=WAL');
+        await db.execute('PRAGMA foreign_keys=ON');
+      },
+    );
+    return _db!;
   }
 
-  Future<void> _init() async {
-    final dbFolder = await getApplicationDocumentsDirectory();
-    final dbPath = p.join(dbFolder.path, 'fitness_tracker.db');
-    
-    await Directory(p.dirname(dbPath)).create(recursive: true);
-    
-    _db = sqlite3.open(dbPath);
-    
-    _db.execute('PRAGMA journal_mode=WAL');
-    _db.execute('PRAGMA foreign_keys=ON');
-    
-    _createTables();
-    _seedFoodDatabase();
-  }
-
-  void _createTables() {
-    _db.execute('''
+  static Future<void> _createTables(Database db) async {
+    await db.execute('''
       CREATE TABLE IF NOT EXISTS user_settings (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         gender TEXT NOT NULL,
@@ -52,7 +46,7 @@ class AppDatabase {
       )
     ''');
 
-    _db.execute('''
+    await db.execute('''
       CREATE TABLE IF NOT EXISTS weight_records (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         weight REAL NOT NULL,
@@ -62,7 +56,7 @@ class AppDatabase {
       )
     ''');
 
-    _db.execute('''
+    await db.execute('''
       CREATE TABLE IF NOT EXISTS exercise_records (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         exercise_type TEXT NOT NULL,
@@ -77,7 +71,7 @@ class AppDatabase {
       )
     ''');
 
-    _db.execute('''
+    await db.execute('''
       CREATE TABLE IF NOT EXISTS food_database (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -92,7 +86,7 @@ class AppDatabase {
       )
     ''');
 
-    _db.execute('''
+    await db.execute('''
       CREATE TABLE IF NOT EXISTS meal_records (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         meal_type TEXT NOT NULL,
@@ -107,7 +101,7 @@ class AppDatabase {
       )
     ''');
 
-    _db.execute('''
+    await db.execute('''
       CREATE TABLE IF NOT EXISTS meal_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         meal_id INTEGER NOT NULL,
@@ -123,7 +117,7 @@ class AppDatabase {
       )
     ''');
 
-    _db.execute('''
+    await db.execute('''
       CREATE TABLE IF NOT EXISTS daily_summaries (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         date TEXT NOT NULL UNIQUE,
@@ -143,23 +137,22 @@ class AppDatabase {
       )
     ''');
 
-    _db.execute('CREATE INDEX IF NOT EXISTS idx_meal_records_date ON meal_records(eaten_at)');
-    _db.execute('CREATE INDEX IF NOT EXISTS idx_exercise_records_date ON exercise_records(start_time)');
-    _db.execute('CREATE INDEX IF NOT EXISTS idx_meal_items_meal ON meal_items(meal_id)');
-    _db.execute('CREATE INDEX IF NOT EXISTS idx_daily_summaries_date ON daily_summaries(date)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_meal_records_date ON meal_records(eaten_at)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_exercise_records_date ON exercise_records(start_time)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_meal_items_meal ON meal_items(meal_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_daily_summaries_date ON daily_summaries(date)');
   }
 
-  void _seedFoodDatabase() {
-    final count = _db.select('SELECT COUNT(*) as cnt FROM food_database').first;
-    if (count['cnt'] as int > 0) return;
+  static Future<void> _seedFoodDatabase(Database db) async {
+    final count = await db.rawQuery('SELECT COUNT(*) as cnt FROM food_database');
+    if ((count.first['cnt'] as int) > 0) return;
 
-    final stmt = _db.prepare('''
-      INSERT INTO food_database (name, category, calories_per_100g, carbs_per_100g, fat_per_100g, protein_per_100g, fiber_per_100g)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''');
-
+    final batch = db.batch();
     for (final food in _defaultFoods) {
-      stmt.execute([
+      batch.rawInsert('''
+        INSERT INTO food_database (name, category, calories_per_100g, carbs_per_100g, fat_per_100g, protein_per_100g, fiber_per_100g)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      ''', [
         food['name'],
         food['category'],
         food['calories'],
@@ -169,20 +162,22 @@ class AppDatabase {
         food['fiber'],
       ]);
     }
-    stmt.dispose();
+    await batch.commit(noResult: true);
   }
 
   // ========== 用户设置 ==========
-  UserSetting? getUserSettings() {
-    final results = _db.select('SELECT * FROM user_settings LIMIT 1');
+  static Future<UserSetting?> getUserSettings() async {
+    final db = _db!;
+    final results = await db.rawQuery('SELECT * FROM user_settings LIMIT 1');
     if (results.isEmpty) return null;
-    return UserSetting.fromMap(results.first);
+    return UserSetting.fromSqliteMap(results.first);
   }
 
-  int saveUserSettings(UserSetting setting) {
-    final existing = getUserSettings();
+  static Future<int> saveUserSettings(UserSetting setting) async {
+    final db = _db!;
+    final existing = await getUserSettings();
     if (existing != null) {
-      _db.execute('''
+      await db.rawUpdate('''
         UPDATE user_settings SET 
           gender=?, age=?, height=?, weight=?, activity_level=?, target_calorie_deficit=?, updated_at=datetime('now')
         WHERE id=?
@@ -192,54 +187,59 @@ class AppDatabase {
       ]);
       return existing.id;
     } else {
-      _db.execute('''
+      final id = await db.rawInsert('''
         INSERT INTO user_settings (gender, age, height, weight, activity_level, target_calorie_deficit)
         VALUES (?, ?, ?, ?, ?, ?)
       ''', [
         setting.gender, setting.age, setting.height, setting.weight,
         setting.activityLevel, setting.targetCalorieDeficit,
       ]);
-      return _db.lastInsertRowId;
+      return id;
     }
   }
 
   // ========== 体重 ==========
-  List<WeightRecord> getWeightRecords({int? limit}) {
+  static Future<List<WeightRecord>> getWeightRecords({int? limit}) async {
+    final db = _db!;
     final sql = 'SELECT * FROM weight_records ORDER BY recorded_at DESC${limit != null ? " LIMIT $limit" : ""}';
-    return _db.select(sql).map((r) => WeightRecord.fromMap(r)).toList();
+    final results = await db.rawQuery(sql);
+    return results.map((r) => WeightRecord.fromSqliteMap(r)).toList();
   }
 
-  int addWeightRecord(WeightRecord record) {
-    _db.execute('''
+  static Future<int> addWeightRecord(WeightRecord record) async {
+    final db = _db!;
+    return await db.rawInsert('''
       INSERT INTO weight_records (weight, body_fat, recorded_at, source)
       VALUES (?, ?, ?, ?)
-    ''', [record.weight, record.bodyFat, record.recordedAt, record.source]);
-    return _db.lastInsertRowId;
+    ''', [record.weight, record.bodyFat, record.recordedAt.toIso8601String(), record.source]);
   }
 
   // ========== 运动 ==========
-  List<ExerciseRecord> getExerciseRecords(DateTime date) {
+  static Future<List<ExerciseRecord>> getExerciseRecords(DateTime date) async {
+    final db = _db!;
     final startOfDay = DateTime(date.year, date.month, date.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
-    return _db.select('''
+    final results = await db.rawQuery('''
       SELECT * FROM exercise_records 
       WHERE start_time >= ? AND start_time < ? 
       ORDER BY start_time DESC
-    ''', [startOfDay.toIso8601String(), endOfDay.toIso8601String()])
-        .map((r) => ExerciseRecord.fromMap(r)).toList();
+    ''', [startOfDay.toIso8601String(), endOfDay.toIso8601String()]);
+    return results.map((r) => ExerciseRecord.fromSqliteMap(r)).toList();
   }
 
-  List<ExerciseRecord> getExerciseRecordsRange(DateTime start, DateTime end) {
-    return _db.select('''
+  static Future<List<ExerciseRecord>> getExerciseRecordsRange(DateTime start, DateTime end) async {
+    final db = _db!;
+    final results = await db.rawQuery('''
       SELECT * FROM exercise_records 
       WHERE start_time >= ? AND start_time <= ? 
       ORDER BY start_time DESC
-    ''', [start.toIso8601String(), end.toIso8601String()])
-        .map((r) => ExerciseRecord.fromMap(r)).toList();
+    ''', [start.toIso8601String(), end.toIso8601String()]);
+    return results.map((r) => ExerciseRecord.fromSqliteMap(r)).toList();
   }
 
-  int addExerciseRecord(ExerciseRecord record) {
-    _db.execute('''
+  static Future<int> addExerciseRecord(ExerciseRecord record) async {
+    final db = _db!;
+    return await db.rawInsert('''
       INSERT INTO exercise_records (exercise_type, duration_minutes, calories_burned, distance, heart_rate_avg, start_time, end_time, source, notes)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', [
@@ -248,13 +248,13 @@ class AppDatabase {
       record.startTime.toIso8601String(), record.endTime?.toIso8601String(),
       record.source, record.notes,
     ]);
-    return _db.lastInsertRowId;
   }
 
-  double getTotalExerciseCalories(DateTime date) {
+  static Future<double> getTotalExerciseCalories(DateTime date) async {
+    final db = _db!;
     final startOfDay = DateTime(date.year, date.month, date.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
-    final r = _db.select('''
+    final r = await db.rawQuery('''
       SELECT COALESCE(SUM(calories_burned), 0) as total FROM exercise_records 
       WHERE start_time >= ? AND start_time < ?
     ''', [startOfDay.toIso8601String(), endOfDay.toIso8601String()]);
@@ -262,25 +262,28 @@ class AppDatabase {
   }
 
   // ========== 餐食 ==========
-  List<MealRecord> getMealRecords(DateTime date) {
+  static Future<List<MealRecord>> getMealRecords(DateTime date) async {
+    final db = _db!;
     final startOfDay = DateTime(date.year, date.month, date.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
-    return _db.select('''
+    final results = await db.rawQuery('''
       SELECT * FROM meal_records 
       WHERE eaten_at >= ? AND eaten_at < ? 
       ORDER BY eaten_at DESC
-    ''', [startOfDay.toIso8601String(), endOfDay.toIso8601String()])
-        .map((r) => MealRecord.fromMap(r)).toList();
+    ''', [startOfDay.toIso8601String(), endOfDay.toIso8601String()]);
+    return results.map((r) => MealRecord.fromSqliteMap(r)).toList();
   }
 
-  MealRecord? getMealRecord(int id) {
-    final results = _db.select('SELECT * FROM meal_records WHERE id = ?', [id]);
+  static Future<MealRecord?> getMealRecord(int id) async {
+    final db = _db!;
+    final results = await db.rawQuery('SELECT * FROM meal_records WHERE id = ?', [id]);
     if (results.isEmpty) return null;
-    return MealRecord.fromMap(results.first);
+    return MealRecord.fromSqliteMap(results.first);
   }
 
-  int addMealRecord(MealRecord record) {
-    _db.execute('''
+  static Future<int> addMealRecord(MealRecord record) async {
+    final db = _db!;
+    return await db.rawInsert('''
       INSERT INTO meal_records (meal_type, eaten_at, photo_path, total_calories, total_carbs, total_fat, total_protein, notes, ai_parsed)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', [
@@ -288,11 +291,11 @@ class AppDatabase {
       record.totalCalories, record.totalCarbs, record.totalFat, record.totalProtein,
       record.notes, record.aiParsed,
     ]);
-    return _db.lastInsertRowId;
   }
 
-  void updateMealRecord(int id, MealRecord record) {
-    _db.execute('''
+  static Future<void> updateMealRecord(int id, MealRecord record) async {
+    final db = _db!;
+    await db.rawUpdate('''
       UPDATE meal_records SET 
         meal_type=?, total_calories=?, total_carbs=?, total_fat=?, total_protein=?, notes=?
       WHERE id=?
@@ -302,15 +305,17 @@ class AppDatabase {
     ]);
   }
 
-  void deleteMealRecord(int id) {
-    _db.execute('DELETE FROM meal_items WHERE meal_id = ?', [id]);
-    _db.execute('DELETE FROM meal_records WHERE id = ?', [id]);
+  static Future<void> deleteMealRecord(int id) async {
+    final db = _db!;
+    await db.rawDelete('DELETE FROM meal_items WHERE meal_id = ?', [id]);
+    await db.rawDelete('DELETE FROM meal_records WHERE id = ?', [id]);
   }
 
-  double getTotalCaloriesIntake(DateTime date) {
+  static Future<double> getTotalCaloriesIntake(DateTime date) async {
+    final db = _db!;
     final startOfDay = DateTime(date.year, date.month, date.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
-    final r = _db.select('''
+    final r = await db.rawQuery('''
       SELECT COALESCE(SUM(total_calories), 0) as total FROM meal_records 
       WHERE eaten_at >= ? AND eaten_at < ?
     ''', [startOfDay.toIso8601String(), endOfDay.toIso8601String()]);
@@ -318,45 +323,51 @@ class AppDatabase {
   }
 
   // ========== 餐食明细 ==========
-  List<MealItem> getMealItems(int mealId) {
-    return _db.select('SELECT * FROM meal_items WHERE meal_id = ?', [mealId])
-        .map((r) => MealItem.fromMap(r)).toList();
+  static Future<List<MealItem>> getMealItems(int mealId) async {
+    final db = _db!;
+    final results = await db.rawQuery('SELECT * FROM meal_items WHERE meal_id = ?', [mealId]);
+    return results.map((r) => MealItem.fromSqliteMap(r)).toList();
   }
 
-  void addMealItems(List<MealItem> items) {
-    final stmt = _db.prepare('''
-      INSERT INTO meal_items (meal_id, food_id, food_name, amount, calories, carbs, fat, protein)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ''');
+  static Future<void> addMealItems(List<MealItem> items) async {
+    final db = _db!;
+    final batch = db.batch();
     for (final item in items) {
-      stmt.execute([item.mealId, item.foodId, item.foodName, item.amount, item.calories, item.carbs, item.fat, item.protein]);
+      batch.rawInsert('''
+        INSERT INTO meal_items (meal_id, food_id, food_name, amount, calories, carbs, fat, protein)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ''', [item.mealId, item.foodId, item.foodName, item.amount, item.calories, item.carbs, item.fat, item.protein]);
     }
-    stmt.dispose();
+    await batch.commit(noResult: true);
   }
 
   // ========== 食物数据库 ==========
-  List<FoodItem> searchFood(String query) {
-    return _db.select('SELECT * FROM food_database WHERE name LIKE ? LIMIT 20', ['%$query%'])
-        .map((r) => FoodItem.fromMap(r)).toList();
+  static Future<List<FoodItem>> searchFood(String query) async {
+    final db = _db!;
+    final results = await db.rawQuery('SELECT * FROM food_database WHERE name LIKE ? LIMIT 20', ['%$query%']);
+    return results.map((r) => FoodItem.fromSqliteMap(r)).toList();
   }
 
-  List<FoodItem> getAllFoods() {
-    return _db.select('SELECT * FROM food_database ORDER BY category, name')
-        .map((r) => FoodItem.fromMap(r)).toList();
+  static Future<List<FoodItem>> getAllFoods() async {
+    final db = _db!;
+    final results = await db.rawQuery('SELECT * FROM food_database ORDER BY category, name');
+    return results.map((r) => FoodItem.fromSqliteMap(r)).toList();
   }
 
   // ========== 每日总结 ==========
-  DailySummary? getDailySummary(DateTime date) {
+  static Future<DailySummary?> getDailySummary(DateTime date) async {
+    final db = _db!;
     final dayStart = DateTime(date.year, date.month, date.day);
-    final results = _db.select('SELECT * FROM daily_summaries WHERE date = ?', [dayStart.toIso8601String()]);
+    final results = await db.rawQuery('SELECT * FROM daily_summaries WHERE date = ?', [dayStart.toIso8601String()]);
     if (results.isEmpty) return null;
-    return DailySummary.fromMap(results.first);
+    return DailySummary.fromSqliteMap(results.first);
   }
 
-  void saveDailySummary(DailySummary summary) {
-    final existing = getDailySummary(summary.date);
+  static Future<void> saveDailySummary(DailySummary summary) async {
+    final db = _db!;
+    final existing = await getDailySummary(summary.date);
     if (existing != null) {
-      _db.execute('''
+      await db.rawUpdate('''
         UPDATE daily_summaries SET 
           bmr=?, exercise_calories=?, total_calories_burned=?, total_calories_intake=?,
           calorie_deficit=?, total_carbs=?, total_fat=?, total_protein=?,
@@ -371,7 +382,7 @@ class AppDatabase {
         existing.id,
       ]);
     } else {
-      _db.execute('''
+      await db.rawInsert('''
         INSERT INTO daily_summaries (date, bmr, exercise_calories, total_calories_burned, total_calories_intake,
           calorie_deficit, total_carbs, total_fat, total_protein, carb_ratio, fat_ratio, protein_ratio,
           suggestion, suggestion_generated)
@@ -386,18 +397,22 @@ class AppDatabase {
     }
   }
 
-  void clearAllData() {
-    _db.execute('DELETE FROM meal_items');
-    _db.execute('DELETE FROM meal_records');
-    _db.execute('DELETE FROM exercise_records');
-    _db.execute('DELETE FROM weight_records');
-    _db.execute('DELETE FROM daily_summaries');
-    _db.execute('DELETE FROM user_settings');
+  static Future<void> clearAllData() async {
+    final db = _db!;
+    await db.rawDelete('DELETE FROM meal_items');
+    await db.rawDelete('DELETE FROM meal_records');
+    await db.rawDelete('DELETE FROM exercise_records');
+    await db.rawDelete('DELETE FROM weight_records');
+    await db.rawDelete('DELETE FROM daily_summaries');
+    await db.rawDelete('DELETE FROM user_settings');
   }
 
-  void dispose() {
-    _db.dispose();
-    _instance = null;
+  static Future<void> dispose() async {
+    final db = _db;
+    if (db != null) {
+      await db.close();
+      _db = null;
+    }
   }
 }
 

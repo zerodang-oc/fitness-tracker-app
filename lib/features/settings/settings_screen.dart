@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/database_provider.dart';
+import '../../core/database/tables.dart';
 
 /// 初始设置 / 个人设置页面
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -29,8 +30,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _loadSettings() async {
-    final db = await ref.read(databaseProvider.future);
-    final settings = db.getUserSettings();
+    await ref.read(databaseProvider.future);
+    final settings = await AppDatabase.getUserSettings();
     if (settings != null) {
       _gender = settings.gender;
       _ageController.text = settings.age.toStringAsFixed(0);
@@ -301,8 +302,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     setState(() => _isSaving = true);
 
     try {
-      final db = await ref.read(databaseProvider.future);
-      db.saveUserSettings(UserSetting(
+      await ref.read(databaseProvider.future);
+      AppDatabase.saveUserSettings(UserSetting(
         gender: _gender,
         age: double.parse(_ageController.text),
         height: double.parse(_heightController.text),
@@ -343,8 +344,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              final db = await ref.read(databaseProvider.future);
-              db.clearAllData();
+              await ref.read(databaseProvider.future);
+              AppDatabase.clearAllData();
               ref.invalidate(userSettingsProvider);
               ref.invalidate(todayExerciseRecordsProvider);
               ref.invalidate(todayMealRecordsProvider);

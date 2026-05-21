@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/utils/calorie_calculator.dart';
 import '../core/utils/suggestion_generator.dart';
+import '../core/database/tables.dart';
+import '../core/database/database.dart';
 import 'database_provider.dart';
 
 // ========== 计算型 Providers ==========
@@ -65,14 +67,14 @@ final mealDeficitsProvider = FutureProvider<Map<String, double>>((ref) async {
 
 /// 今日总结
 final todaySummaryProvider = FutureProvider<DailySummary?>((ref) async {
-  final db = await ref.watch(databaseProvider.future);
+  await ref.watch(databaseProvider.future);
   final date = ref.watch(selectedDateProvider);
-  return db.getDailySummary(date);
+  return AppDatabase.getDailySummary(date);
 });
 
 /// 保存每日总结并生成建议
 Future<void> saveDailySummary(dynamic ref, DateTime date) async {
-  final db = await ref.read(databaseProvider.future);
+  await ref.read(databaseProvider.future);
   final settings = await ref.read(userSettingsProvider.future);
   if (settings == null) return;
 
@@ -93,7 +95,7 @@ Future<void> saveDailySummary(dynamic ref, DateTime date) async {
     fatGrams: totalFat,
   );
 
-  final existingSummary = db.getDailySummary(date);
+  final existingSummary = await AppDatabase.getDailySummary(date);
 
   final summary = DailySummary(
     id: existingSummary?.id ?? 0,
@@ -119,7 +121,7 @@ Future<void> saveDailySummary(dynamic ref, DateTime date) async {
     userSettings: settings,
   );
 
-  db.saveDailySummary(DailySummary(
+  await AppDatabase.saveDailySummary(DailySummary(
     id: existingSummary?.id ?? 0,
     date: DateTime(date.year, date.month, date.day),
     bmr: bmr,

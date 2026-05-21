@@ -6,6 +6,7 @@ import '../../core/meal_type.dart';
 import '../../core/utils/calorie_calculator.dart';
 import '../../providers/database_provider.dart';
 import '../../providers/today_providers.dart';
+import '../../core/database/tables.dart';
 
 /// 分析与报告页面
 class AnalysisScreen extends ConsumerWidget {
@@ -41,7 +42,7 @@ class AnalysisScreen extends ConsumerWidget {
             summaryAsync.when(
               loading: () => const SizedBox(),
               error: (_, __) => const SizedBox(),
-              data: (summary) {
+              data: (DailySummary? summary) {
                 if (summary == null || summary.suggestion.isEmpty) return const SizedBox();
                 return Card(
                   child: Padding(
@@ -247,7 +248,7 @@ class AnalysisScreen extends ConsumerWidget {
             mealsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (_, __) => const Center(child: Text('暂无数据')),
-              data: (meals) {
+              data: (List<MealRecord> meals) {
                 final totalCarbs = meals.fold<double>(0, (s, m) => s + m.totalCarbs);
                 final totalProtein = meals.fold<double>(0, (s, m) => s + m.totalProtein);
                 final totalFat = meals.fold<double>(0, (s, m) => s + m.totalFat);
