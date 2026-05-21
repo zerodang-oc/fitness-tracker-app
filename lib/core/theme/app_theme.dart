@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 class AppTheme {
@@ -23,6 +24,21 @@ class AppTheme {
   static const Color cardColor = Colors.white;
 
   static ThemeData get lightTheme {
+    // Web 下使用系统字体避免 Noto 字体缺失警告
+    final textTheme = kIsWeb
+        ? const TextTheme(
+            bodyLarge: TextStyle(fontFamily: 'sans-serif'),
+            bodyMedium: TextStyle(fontFamily: 'sans-serif'),
+            bodySmall: TextStyle(fontFamily: 'sans-serif'),
+            titleLarge: TextStyle(fontFamily: 'sans-serif'),
+            titleMedium: TextStyle(fontFamily: 'sans-serif'),
+            titleSmall: TextStyle(fontFamily: 'sans-serif'),
+            labelLarge: TextStyle(fontFamily: 'sans-serif'),
+            labelMedium: TextStyle(fontFamily: 'sans-serif'),
+            labelSmall: TextStyle(fontFamily: 'sans-serif'),
+          )
+        : null;
+
     return ThemeData(
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(
@@ -33,6 +49,7 @@ class AppTheme {
         surface: backgroundLight,
       ),
       scaffoldBackgroundColor: backgroundLight,
+      textTheme: textTheme,
       
       appBarTheme: const AppBarTheme(
         centerTitle: true,
